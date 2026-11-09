@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Creator Reply Agent — 决策链路 Demo</title>
+<style>
+  :root{
+    --ink:#0f1216;
+    --ink2:#4b5462;
+    --ink3:#8b95a5;
+    --line:#e5e8ef;
+    --line2:#eef0f5;
+    --bg:#f5f6f9;
+    --card:#ffffff;
+    --accent:#2f4bf0;
+    --accent-soft:#eef1ff;
+    --red:#c8392b;
+    --red-soft:#fdf0ee;
+    --green:#1c7f57;
+    --green-soft:#eef7f2;
+    --amber:#a86a08;
+    --amber-soft:#fdf5e8;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    font-size:14px;line-height:1.6;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* ---------- top bar ---------- */
+  header{
+    height:58px;flex:0 0 58px;display:flex;align-items:center;gap:22px;
+    padding:0 22px;background:#fff;border-bottom:1px solid var(--line);
+    z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.2px}
+  .logo{
+    width:24px;height:24px;border-radius:7px;
+    background:linear-gradient(140deg,#2f4bf0,#7b5cf5);
+    position:relative;flex:0 0 24px;
+  }
+  .logo::after{
+    content:"";position:absolute;inset:6px;border-radius:3px;
+    border:1.5px solid rgba(255,255,255,.85);border-right-color:transparent;border-bottom-color:transparent;
+  }
+  .brand small{font-weight:400;color:var(--ink3);font-size:12px;letter-spacing:0}
+  .tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:9px;overflow-x:auto;max-width:46vw}
+  .tab{
+    border:0;background:transparent;padding:6px 12px;border-radius:7px;
+    font-size:12.5px;color:var(--ink2);cursor:pointer;font-family:inherit;
+    transition:.16s;white-space:nowrap;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,18,22,.09);font-weight:600}
+  .spacer{flex:1}
+  .hint{font-size:11.5px;color:var(--ink3)}
+  .btn{
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:7px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;
+    font-family:inherit;transition:.16s;font-weight:550;
+  }
+  .btn:hover{border-color:#cfd5e2;background:#fbfcfe}
+  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn.primary:hover{background:#242a33}
+
+  /* ---------- layout ---------- */
+  main{flex:1;display:grid;grid-template-columns:396px 1fr;overflow:hidden}
+  .pane{overflow-y:auto;flex:1;min-height:0}
+  .pane::-webkit-scrollbar{width:8px}
+  .pane::-webkit-scrollbar-thumb{background:#d8dde7;border-radius:4px;border:2px solid var(--bg)}
+
+  /* ---------- left ---------- */
+  aside{border-right:1px solid var(--line);background:#fff;display:flex;flex-direction:column}
+  .creator{padding:20px 20px 16px;border-bottom:1px solid var(--line2)}
+  .crow{display:flex;gap:12px;align-items:flex-start}
+  .avatar{
+    width:44px;height:44px;border-radius:50%;flex:0 0 44px;
+    display:grid;place-items:center;color:#fff;font-weight:650;font-size:15px;
+    letter-spacing:.5px;
+  }
+  .cname{font-weight:650;font-size:15px;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
+  .handle{font-size:12px;color:var(--ink3);font-family:var(--mono)}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{
+    font-size:11px;padding:3px 8px;border-radius:20px;background:var(--bg);
+    color:var(--ink2);border:1px solid var(--line2);white-space:nowrap;
+  }
+  .chip.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .score{margin-top:14px}
+  .score-top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-bottom:5px}
+  .score-top b{color:var(--ink);font-size:12.5px}
+  .bar{height:4px;background:var(--line2);border-radius:3px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+  /* state machine */
+  .state{margin-top:16px}
+  .state-label{font-size:10.5px;letter-spacing:.9px;color:var(--ink3);text-transform:uppercase;margin-bottom:8px}
+  .flow{display:flex;align-items:center;gap:0}
+  .st{
+    font-size:11px;padding:4px 8px;border-radius:6px;color:var(--ink3);
+    background:transparent;border:1px solid transparent;white-space:nowrap;transition:.2s;
+  }
+  .st.done{color:var(--ink2);background:var(--bg)}
+  .st.active{background:var(--accent-soft);color:var(--accent);border-color:#ccd5ff;font-weight:600}
+  .st.dead{color:var(--red);background:var(--red-soft);border-color:#f3d5d0}
+  .arrow{width:12px;height:1px;background:var(--line);flex:1;min-width:8px}
+
+  /* conversation */
+  .convo{flex:1;min-height:0;padding:18px 18px 26px;overflow-y:auto}
+  .convo-title{font-size:10.5px;letter-spacing:.9px;color:var(--ink3);text-transform:uppercase;margin-bottom:14px}
+  .msg{margin-bottom:14px;display:flex;flex-direction:column;max-width:100%}
+  .msg .who{font-size:11px;color:var(--ink3);margin-bottom:4px;display:flex;gap:6px;align-items:center}
+  .msg .who b{color:var(--ink2);font-weight:600}
+  .bubble{
+    padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.62;
+    border:1px solid var(--line2);background:#fbfcfe;
+  }
+  .msg.in .bubble{background:var(--bg);border-color:var(--line2);border-top-left-radius:4px}
+  .msg.out{align-items:flex-end}
+  .msg.out .bubble{background:var(--ink);color:#fff;border-color:var(--ink);border-top-right-radius:4px}
+  .msg.out .who{flex-direction:row-reverse}
+  .time{font-size:10.5px;color:#aab2c0;font-family:var(--mono)}
+  .sys{
+    margin:14px 0;padding:9px 12px;border-radius:9px;font-size:12px;
+    background:var(--amber-soft);border:1px solid #f2e2c6;color:#7a4e06;
+    display:flex;gap:8px;align-items:flex-start;
+  }
+  .sys.block{background:var(--red-soft);border-color:#f0d3cd;color:#8f2b1f}
+  .sys.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14603f}
+  .sys svg{flex:0 0 14px;margin-top:2px}
+
+  /* ---------- right ---------- */
+  section.flowpane{display:flex;flex-direction:column;background:var(--bg);min-height:0}
+  .fhead{
+    padding:18px 26px 14px;background:#fff;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:14px;
+  }
+  .fhead h1{font-size:15px;font-weight:650;letter-spacing:-.2px}
+  .fhead p{font-size:12px;color:var(--ink3);margin-top:2px}
+  .verdict{
+    margin-left:auto;display:flex;align-items:center;gap:8px;
+    padding:7px 13px;border-radius:9px;font-size:12.5px;font-weight:600;white-space:nowrap;
+  }
+  .verdict .dot{width:6px;height:6px;border-radius:50%}
+  .verdict.human{background:var(--red-soft);color:#8f2b1f;border:1px solid #f0d3cd}
+  .verdict.human .dot{background:var(--red)}
+  .verdict.auto{background:var(--green-soft);color:#14603f;border:1px solid #cfe8dd}
+  .verdict.auto .dot{background:var(--green)}
+
+  .steps{padding:20px 26px 60px;display:flex;flex-direction:column;gap:12px}
+
+  .step{
+    background:#fff;border:1px solid var(--line);border-radius:13px;
+    overflow:hidden;transition:.28s;opacity:.22;transform:translateY(6px);
+    border-left:3px solid var(--line);
+  }
+  .step.show{opacity:1;transform:none}
+  .step.show.cur{border-left-color:var(--accent);box-shadow:0 4px 18px rgba(47,75,240,.09)}
+  .step.show.blocked{border-left-color:var(--red)}
+  .step.show.passed{border-left-color:var(--green)}
+  .shead{display:flex;align-items:flex-start;gap:13px;padding:15px 18px;cursor:pointer}
+  .num{
+    font-family:var(--mono);font-size:11px;color:var(--ink3);
+    padding-top:2px;flex:0 0 22px;
+  }
+  .stitle{font-size:13.5px;font-weight:650;letter-spacing:-.1px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .stitle .tag{
+    font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;letter-spacing:.2px;
+  }
+  .tag.g{background:var(--green-soft);color:var(--green)}
+  .tag.r{background:var(--red-soft);color:var(--red)}
+  .tag.b{background:var(--accent-soft);color:var(--accent)}
+  .tag.a{background:var(--amber-soft);color:var(--amber)}
+  .sdesc{font-size:12.5px;color:var(--ink2);margin-top:3px;line-height:1.55}
+  .why{font-size:11.5px;color:var(--ink3);margin-top:6px;line-height:1.55}
+  .why b{color:var(--ink2);font-weight:600}
+  .caret{margin-left:auto;color:#b8c0cd;transition:.2s;flex:0 0 auto;padding-top:3px}
+  .step.open .caret{transform:rotate(90deg)}
+
+  .sbody{display:none;padding:0 18px 17px 53px;border-top:1px solid var(--line2);margin-top:2px}
+  .step.open .sbody{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+
+  .kv{display:grid;grid-template-columns:112px 1fr;gap:7px 14px;padding-top:14px;font-size:12.5px}
+  .kv dt{color:var(--ink3);font-size:12px}
+  .kv dd{color:var(--ink);line-height:1.55}
+  .kv dd.hi{color:var(--accent);font-weight:600}
+  .kv dd.warn{color:var(--red);font-weight:600}
+  .kv dd.ok{color:var(--green);font-weight:600}
+
+  .conf{display:flex;align-items:center;gap:8px;margin-top:4px}
+  .conf .bar{width:110px}
+  .conf span{font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+
+  /* policy checks */
+  .checks{padding-top:13px;display:flex;flex-direction:column;gap:7px}
+  .ck{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;line-height:1.5}
+  .ck .ic{flex:0 0 15px;margin-top:2px}
+  .ck.pass{color:var(--ink2)}
+  .ck.fail{color:var(--red);font-weight:600}
+  .ck.warnc{color:var(--amber)}
+  .ck small{display:block;color:var(--ink3);font-weight:400;font-size:11.5px;margin-top:1px}
+
+  /* email */
+  .mail{margin-top:13px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fcfcfe}
+  .mail-h{padding:9px 13px;border-bottom:1px solid var(--line2);font-size:11.5px;color:var(--ink3);background:#fff;display:flex;gap:8px}
+  .mail-h b{color:var(--ink2);font-weight:600}
+  .mail-b{padding:14px 15px;font-size:12.5px;line-height:1.75;color:#2b323c;white-space:pre-line}
+  .mail-b mark{background:#fff3c4;color:inherit;padding:1px 2px;border-radius:3px}
+  .mail-f{padding:8px 13px;border-top:1px dashed var(--line);font-size:11px;color:var(--ink3);display:flex;justify-content:space-between}
+
+  /* handoff */
+  .handoff{margin-top:13px;background:var(--red-soft);border:1px solid #f0d3cd;border-radius:10px;padding:12px 14px}
+  .handoff h4{font-size:11.5px;letter-spacing:.5px;color:#8f2b1f;text-transform:uppercase;margin-bottom:7px}
+  .handoff ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+  .handoff li{font-size:12.5px;color:#7a2b20;padding-left:13px;position:relative;line-height:1.55}
+  .handoff li::before{content:"—";position:absolute;left:0;color:#c98b80}
+
+  /* footer metrics */
+  .metrics{
+    padding:14px 26px;background:#fff;border-top:1px solid var(--line);
+    display:flex;gap:0;flex:0 0 auto;
+  }
+  .m{flex:1;padding-right:16px;border-right:1px solid var(--line2);margin-right:16px}
+  .m:last-child{border:0;margin:0;padding:0}
+  .m .k{font-size:10.5px;letter-spacing:.7px;color:var(--ink3);text-transform:uppercase;margin-bottom:3px}
+  .m .v{font-size:16px;font-weight:650;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+  .m .v.r{color:var(--red)}
+  .m .v.g{color:var(--green)}
+  .m .v small{font-size:11px;font-weight:400;color:var(--ink3);margin-left:3px}
+
+  @media (max-width:1020px){
+    main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    aside{border-right:0;border-bottom:1px solid var(--line);max-height:46vh}
+    .metrics{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo"></div>
+    <span>Creator Reply Agent <small>· 决策链路概念 Demo</small></span>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="spacer"></div>
+  <span class="hint">键盘 1 / 2 / 3 切换 · 空格播放</span>
+  <button class="btn" id="expandAll">全部展开</button>
+  <button class="btn primary" id="play">▶ 播放决策链</button>
+</header>
+
+<main>
+  <aside>
+    <div class="creator" id="creator"></div>
+    <div class="convo" id="convo"></div>
+  </aside>
+
+  <section class="flowpane">
+    <div class="fhead">
+      <div>
+        <h1 id="caseTitle"></h1>
+        <p id="caseSub"></p>
+      </div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+    <div class="pane">
+      <div class="steps" id="steps"></div>
+    </div>
+    <div class="metrics" id="metrics"></div>
+  </section>
+</main>
+
+<script>
+const IC = {
+  check:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#1c7f57" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>',
+  cross:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#c8392b" stroke-width="1.9" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  block:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#c8392b" stroke-width="1.7"><circle cx="8" cy="8" r="5.6"/><path d="M4.2 11.8l7.6-7.6" stroke-linecap="round"/></svg>',
+  warn:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#a86a08" stroke-width="1.7" stroke-linecap="round"><path d="M8 2.4l5.6 10.2H2.4L8 2.4z" stroke-linejoin="round"/><path d="M8 6.4v3M8 11.4h.01"/></svg>',
+  caret:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>',
+  hand:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v6M8 2.5L5 5.5M8 2.5l3 3"/><path d="M3 10.5v2h10v-2"/></svg>',
+  info:'<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 7.2v4M8 4.9h.01"/></svg>'
+};
+
+const CASES = [
+  /* ================= CASE 1 ================= */
+  {
+    tab:'议价超出预算',
+    title:'达人回价 $750，超预算 15%',
+    sub:'议价类意图 · 涉及金额承诺 · 高风险',
+    verdict:{label:'不自动回复 · 转人工', tone:'human'},
+    state:[
+      {t:'新达人', s:'done'},
+      {t:'已报价', s:'active'},
+      {t:'履约中'},
+      {t:'已完成'}
+    ],
+    creator:{
+      name:'Sofia Duarte', handle:'@sofi.organized', init:'SD',
+      grad:'linear-gradient(140deg,#c96b4a,#e0a24c)',
+      chips:['TikTok','8.2 万粉丝','家居整理','巴西 · 葡语','Tier 2'],
+      score:78, scoreNote:'履约分 78 / 100 · 历史 6 单 · 0 次违约',
+      tags:['历史均价 $520','互动率 4.3%','偏好家庭场景']
+    },
+    convo:[
+      {from:'out', who:'AhaCreator · PureOxy 项目', time:'周一 09:12',
+       text:'Hi Sofia! We loved your pantry-organization series. We are looking for 2 short videos for our outdoor cleaner — $500 total, posted within 3 weeks. Interested?'},
+      {from:'in', who:'Sofia', time:'周一 11:40',
+       text:'Love the product, honestly. But $500 for 2 videos is too low for me — I usually charge $800 for that. Can you do $750? I can start next week.'},
+      {from:'sys', tone:'block',
+       text:'AI 生成草稿完成，但在发出前被策略校验拦截：议价类 + 金额承诺，超出自动回复权限。'}
+    ],
+    steps:[
+      {n:'01', name:'识别', tag:'意图 × 风险', tone:'r',
+       desc:'议价意图 0.96，同时识别出「金额承诺」与「档期承诺」两个风险信号。',
+       why:'识别不是只判断「他说了什么」，还要判断「这句话一旦回错，代价有多大」。',
+       body:{type:'rows', rows:[
+         ['意图', '议价 · 要求上调报价', 'hi'],
+         ['置信度', '0.96（阈值 0.70）', 'ok'],
+         ['实体', '$750、2 条视频、下周开工'],
+         ['情绪', '积极 / 有合作意愿'],
+         ['风险信号', '金额承诺 + 档期承诺', 'warn'],
+         ['风险等级', '高 → 禁止自动发送', 'warn']
+       ], conf:0.96}},
+      {n:'02', name:'策略选择', tag:'目标 · 让步空间', tone:'a',
+       desc:'目标是把状态从「已报价」推进到「已签约」，但让步空间有硬边界。',
+       why:'策略层决定「我能让到哪」，这是模型不该自由发挥的部分，必须由业务规则给定。',
+       body:{type:'rows', rows:[
+         ['目标状态', '已报价 → 已签约（一次只推一格）'],
+         ['单条预算上限', '$325 / 条（合计 $650）', 'hi'],
+         ['对方要求', '$750（超出上限 15%）', 'warn'],
+         ['可赠条款', '3 个月复投意向 + 优先选品'],
+         ['不可让项', '账期（仍为交付后 10 天）'],
+         ['建议动作', '人工确认后，用「$650 + 复投」组合谈判']
+       ]}},
+      {n:'03', name:'生成', tag:'五段式骨架', tone:'b',
+       desc:'按 Hook / Value / Proof / Ask / Exit 生成草稿，槽位由状态向量填充。',
+       why:'模板不是多套文案，是「一个骨架 + 变量」。骨架不变，变量来自达人的真实数据。',
+       body:{type:'mail',
+         subject:'Re: Pantry series × PureOxy — a middle ground',
+         html:'Hi <mark>Sofia</mark>,\n\nYour <mark>3-part pantry reset</mark> is exactly the kind of before/after our buyers trust — that is why we reached out to you first, not to a list.\n\nI hear you on the rate. Our budget for this test is capped at <mark>$650 for two videos</mark>, and I can add <mark>first access to our Q1 restock campaign</mark> if the first two perform.\n\nWould <mark>$650 + Q1 priority</mark> work for you? If yes, I will send the brief today and you can start <mark>next Monday</mark>.\n\nEither way — thanks for the honest reply.\n\nBest,\nMia · PureOxy partnerships',
+         foot:['变量来源：历史均价 / 内容标签 / 预算上限','字数 118 · 可读性 62']}},
+      {n:'04', name:'策略校验', tag:'确定性规则 · 拦截', tone:'r',
+       desc:'生成完成 ≠ 可以发送。四条规则里有一条直接拦截。',
+       why:'这一步是整套系统最容易被跳过、也最容易出事故的地方：一句「可以给到 800」就是成本事故。',
+       body:{type:'checks', items:[
+         {ok:'pass', text:'金额 $650 未超预算上限', sub:'上限 $650 · 实际 $650'},
+         {ok:'pass', text:'承诺均在白名单内', sub:'复投意向 / 优先选品 已登记'},
+         {ok:'pass', text:'个性化证据非空', sub:'引用了真实内容「3-part pantry reset」'},
+         {ok:'fail', text:'议价类对话禁止自动发送', sub:'规则 R-07：涉及报价调整必须人工确认 → 阻断发送'}
+       ]}},
+      {n:'05', name:'闭环', tag:'转人工 · 带交接包', tone:'r',
+       desc:'不把问题丢给人，而是带着判断结果交给人工，人只需要点「同意」或「改价」。',
+       why:'没有交接包的转人工，等于让人从零开始读聊天记录——这是体验崩塌最常见的原因。',
+       body:{type:'handoff', items:[
+         '达人诉求：$750 / 2 条，可下周开工',
+         '系统建议：$650 + Q1 优先权，预计接受率 71%',
+         '已生成草稿，人工确认后一键发送',
+         '超时规则：24 小时内未处理则升级至项目负责人'
+       ]}}
+    ],
+    metrics:[
+      {k:'意图置信度', v:'0.96'},
+      {k:'风险等级', v:'高', cls:'r'},
+      {k:'AI 自动发出', v:'否', cls:'r'},
+      {k:'人工介入点', v:'1 次', cls:''},
+      {k:'建议方案接受率', v:'71%', cls:'g'}
+    ]
+  },
+
+  /* ================= CASE 2 ================= */
+  {
+    tab:'48 小时未回复',
+    title:'首次外联 52 小时无响应',
+    sub:'沉默意图 · 低风险 · 可自动推进',
+    verdict:{label:'可自动回复 · 自动提醒', tone:'auto'},
+    state:[
+      {t:'新达人', s:'active'},
+      {t:'已报价'},
+      {t:'履约中'},
+      {t:'已完成'}
+    ],
+    creator:{
+      name:'Kenji Watanabe', handle:'@kenji.setup', init:'KW',
+      grad:'linear-gradient(140deg,#4a6b8a,#6fa3c4)',
+      chips:['YouTube','2.4 万粉丝','3C 开箱','日本 · 日语','Tier 3'],
+      score:64, scoreNote:'履约分 64 / 100 · 历史 2 单 · 1 次延期',
+      tags:['历史均价 $260','回复常在夜间','偏好桌面场景']
+    },
+    convo:[
+      {from:'out', who:'AhaCreator · 品牌方', time:'周五 18:03',
+       text:'Hi Kenji — your desk-setup teardown got 40k views. We are launching a compact docking station and would love a 60-second honest review. $260, flexible timeline.'},
+      {from:'sys', tone:'',
+       text:'已读未回 52 小时 · 第 1 次外联 · 历史最佳触达渠道：YouTube 评论 → 邮件（回复率 2.1 倍）'},
+      {from:'sys', tone:'ok',
+       text:'AI 生成第 2 次触点并自动发送：更换渠道、补充具体信息、降低回复门槛。'}
+    ],
+    steps:[
+      {n:'01', name:'识别', tag:'意图 × 风险', tone:'g',
+       desc:'识别为「沉默 · 未决策」，不是拒绝。风险等级低，允许自动推进。',
+       why:'「没回」和「不想合作」是两种完全不同的状态。把沉默当成拒绝，是自动化的第一大误伤。',
+       body:{type:'rows', rows:[
+         ['意图', '未响应 / 尚未决策', 'hi'],
+         ['置信度', '0.88'],
+         ['已读状态', '已读 · 52 小时'],
+         ['历史行为', '平均首次回复 3.2 天（夜间活跃）'],
+         ['风险信号', '无金额 / 无承诺', 'ok'],
+         ['风险等级', '低 → 允许自动回复', 'ok']
+       ], conf:0.88}},
+      {n:'02', name:'策略选择', tag:'目标 · 换渠道', tone:'a',
+       desc:'目标不是催促，是降低回复成本。策略是换渠道 + 提升信息密度。',
+       why:'第 2 次触点的目标应该重新定义为「让对方更容易回」，而不是「提醒对方回」。',
+       body:{type:'rows', rows:[
+         ['目标状态', '未响应 → 已接洽'],
+         ['触点次数', '第 2 次（上限 3 次）'],
+         ['渠道切换', '邮件 → YouTube 私信 → 回邮件', 'hi'],
+         ['频率合规', '间隔 ≥ 48h，符合外联频率规则', 'ok'],
+         ['不可让项', '不额外加价（首轮不谈钱）']
+       ]}},
+      {n:'03', name:'生成', tag:'短 · 具体 · 低门槛', tone:'b',
+       desc:'不用长邮件。只做三件事：证明看过他的内容、给出一个具体数字、把回复成本降到一句话。',
+       why:'沉默后的第二封信越长越像群发。这封信的目标是「让他愿意回一个字」，不是「把话说完整」。',
+       body:{type:'mail',
+         subject:'Re: your desk teardown — one quick question',
+         html:'Hi <mark>Kenji</mark>,\n\nI know inboxes get buried — no pressure at all.\n\nOne thing I did not say clearly last time: <mark>we only need 60 seconds</mark>, you keep full creative control over the script, and <mark>$260 is the floor, not the ceiling</mark> if the setup needs more work.\n\nIf it is a no, just reply "pass" and I will stop here.\n\n— Mia · AhaCreator',
+         foot:['长度 62 词 · 比首封短 41%','含明确退出选项，降低回复心理成本']}},
+      {n:'04', name:'策略校验', tag:'通过', tone:'g',
+       desc:'四条规则全部通过，允许自动发送。',
+       why:'低风险场景下不该让人来点确认——把人放在这里，等于让自动化失去意义。',
+       body:{type:'checks', items:[
+         {ok:'pass', text:'非重复内容', sub:'与首封正文重合度 18%，低于 40% 上限'},
+         {ok:'pass', text:'频率合规', sub:'间隔 52h ≥ 48h'},
+         {ok:'pass', text:'个性化证据非空', sub:'引用「desk teardown」'},
+         {ok:'pass', text:'无金额承诺超限', sub:'$260 在授权区间内'}
+       ]}},
+      {n:'05', name:'闭环', tag:'定时 · 自动换人', tone:'g',
+       desc:'再次发送后进入等待。若仍无响应，自动启用备选达人，原订单冻结而非取消。',
+       why:'供给侧的确定性不来自「说服」，来自「永远有 Plan B」。这是双边平台最该自动化的一环。',
+       body:{type:'handoff', items:[
+         '已发送第 2 次触点 · 下次检查 48h 后',
+         '仍未响应 → 自动启用备选达人 B（同圈层，报价 $240）',
+         '原订单冻结，不占用品牌预算',
+         '达人后续回信 → 自动恢复对话，不丢失上下文'
+       ]}}
+    ],
+    metrics:[
+      {k:'意图置信度', v:'0.88'},
+      {k:'风险等级', v:'低', cls:'g'},
+      {k:'AI 自动发出', v:'是', cls:'g'},
+      {k:'人工介入点', v:'0 次', cls:'g'},
+      {k:'预计节省', v:'26 分钟', cls:'g'}
+    ]
+  },
+
+  /* ================= CASE 3 ================= */
+  {
+    tab:'交付不达 Brief',
+    title:'已交付，但三条硬指标不达标',
+    sub:'交付意图 · 中风险 · 补量而非退款',
+    verdict:{label:'可自动回复 · 生成补量方案', tone:'auto'},
+    state:[
+      {t:'新达人', s:'done'},
+      {t:'已报价', s:'done'},
+      {t:'履约中', s:'active'},
+      {t:'已完成'}
+    ],
+    creator:{
+      name:'Marco Ferretti', handle:'@marco.outdoors', init:'MF',
+      grad:'linear-gradient(140deg,#4d7a5a,#8bb06a)',
+      chips:['Instagram','5.6 万粉丝','户外露营','意大利 · 英语','Tier 2'],
+      score:81, scoreNote:'履约分 81 / 100 · 历史 11 单 · 2 次返稿',
+      tags:['历史均价 $430','内容质量高','偶发超时']
+    },
+    convo:[
+      {from:'out', who:'AhaCreator · Tufting Gun 项目', time:'周三 16:20',
+       text:'Brief: 30s+ video, product visible in first 3s, mention "no-slip backing" once, link in bio.'},
+      {from:'in', who:'Marco', time:'周五 20:11',
+       text:'Here it is! Filmed at the campsite, think the vibe is great. Let me know if you need anything else.'},
+      {from:'sys', tone:'',
+       text:'AI 质检完成：内容已交付，但 3 项硬指标未达标。未触发退款流程（因已交付），转补量沟通。'}
+    ],
+    steps:[
+      {n:'01', name:'识别', tag:'交付 × 质检', tone:'a',
+       desc:'意图是「交付完成」，但质检结果与 Brief 不一致。这是「已交付但不合格」，不是「未交付」。',
+       why:'把「质量不达标」误判成「未履约」，会导致直接退款——钱退了，窗口期也废了。分类错了，策略就全错。',
+       body:{type:'checks', items:[
+         {ok:'pass', text:'已交付且已发布', sub:'Instagram Reels · 周五 20:11'},
+         {ok:'fail', text:'时长 18 秒 < 要求 30 秒', sub:'缺口 40%'},
+         {ok:'fail', text:'前 3 秒无产品露出', sub:'第 9 秒才出现'},
+         {ok:'fail', text:'未口播「no-slip backing」', sub:'仅字幕出现一次'}
+       ]}},
+      {n:'02', name:'策略选择', tag:'补量 > 退款', tone:'a',
+       desc:'策略不是退款，是补量：已付 50%，退款对品牌是净损失，补一条才是。',
+       why:'退款只解决「钱」，不解决「这次 Campaign 黄了」。补量承诺才是这类产品的真正差异化。',
+       body:{type:'rows', rows:[
+         ['问题定性', '已交付但不达 Brief（非违约）'],
+         ['策略', '补量 + 修改窗口，而非退款', 'hi'],
+         ['已付金额', '50%（$215）已预付'],
+         ['可赠条款', '延长至 10 天 + 免费补 1 条 15 秒切片'],
+         ['不可让项', '必须包含产品露出与卖点口播'],
+         ['履约影响', '本次记录「返稿」，扣履约分 3 分']
+       ]}},
+      {n:'03', name:'生成', tag:'先肯定 · 再清单', tone:'b',
+       desc:'先承认内容本身的价值，再给出可执行的 checklist，最后给明确时间点。',
+       why:'补量沟通最容易写成投诉信。一旦让对方觉得被否定，二次交付质量会更差。',
+       body:{type:'mail',
+         subject:'Re: your campsite cut — two small fixes and we are live',
+         html:'Hi <mark>Marco</mark>,\n\nThe campsite setting is genuinely great — that first shot of the tent is exactly the mood we wanted.\n\nTwo things our compliance check flagged before we can run it:\n1. Needs to be <mark>30 seconds or longer</mark> (currently 18s)\n2. The product needs to be visible in the <mark>first 3 seconds</mark>, and we need "<mark>no-slip backing</mark>" said out loud once\n\nIf you can re-cut by <mark>Tuesday</mark>, we will still hit the campaign window — and we will add a <mark>free 15s cut-down version</mark> to your deliverable list at no extra cost.\n\nHappy to jump on a 5-minute call if easier.\n\n— Mia · AhaCreator',
+         foot:['补量而非退款 · 保留合作关系','含明确 deadline 与额外收益']}},
+      {n:'04', name:'策略校验', tag:'通过（有限制）', tone:'g',
+       desc:'通过，但禁止承诺额外付费——补量必须落在「无追加预算」的边界内。',
+       why:'补量本身是成本。规则要防止 AI 为了留住达人，擅自承诺加钱。',
+       body:{type:'checks', items:[
+         {ok:'pass', text:'无额外付费承诺', sub:'规则 R-11：补量不得追加预算'},
+         {ok:'pass', text:'deadline 在 Campaign 窗口内', sub:'周二交付 → 窗口周五关闭'},
+         {ok:'warn', text:'对方为高价值达人，需保留关系', sub:'建议人工抽检一次语气'},
+         {ok:'pass', text:'个性化证据非空', sub:'引用「first shot of the tent」'}
+       ]}},
+      {n:'05', name:'闭环', tag:'72 小时修改窗口', tone:'a',
+       desc:'设置修改窗口与升级路径：改好了放款，改不好才转到部分退款。',
+       why:'退款应该是最后一档，不是第一反应。先给一次改进机会，才有机会把一次失败变成长期供给。',
+       body:{type:'handoff', items:[
+         '修改窗口 72 小时 · 到期前 12 小时自动提醒',
+         '按时达标 → 放款尾款 50%，履约分恢复 1 分',
+         '逾期未改 → 触发补量流程（由平台补 1 条同量级内容）',
+         '连续两次返稿 → 进入达人观察名单，暂停派单 30 天'
+       ]}}
+    ],
+    metrics:[
+      {k:'意向/交付判定', v:'已交付'},
+      {k:'风险等级', v:'中', cls:''},
+      {k:'AI 自动发出', v:'是', cls:'g'},
+      {k:'人工介入点', v:'抽检 1 次', cls:''},
+      {k:'避免退款', v:'$430', cls:'g'}
+    ]
+  }
+];
+
+/* ---------- render ---------- */
+let cur = 0, timers = [];
+
+const $ = s => document.querySelector(s);
+
+function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers = []; }
+
+function renderTabs(){
+  $('#tabs').innerHTML = CASES.map((c,i)=>
+    `<button class="tab ${i===cur?'on':''}" data-i="${i}">${i+1}. ${c.tab}</button>`
+  ).join('');
+  $('#tabs').querySelectorAll('.tab').forEach(b=>{
+    b.onclick = ()=>{ cur = +b.dataset.i; render(); };
+  });
+}
+
+function renderCreator(c){
+  const k = c.creator;
+  const flow = c.state.map((s,i)=>{
+    const cls = s.s || '';
+    const arrow = i < c.state.length-1 ? '<div class="arrow"></div>' : '';
+    return `<div class="st ${cls}">${s.t}</div>${arrow}`;
+  }).join('');
+  $('#creator').innerHTML = `
+    <div class="crow">
+      <div class="avatar" style="background:${k.grad}">${k.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="cname">${k.name}</div>
+        <div class="handle">${k.handle}</div>
+      </div>
+    </div>
+    <div class="meta">${k.chips.map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+    <div class="score">
+      <div class="score-top"><span>${k.scoreNote}</span><b>${k.score}</b></div>
+      <div class="bar"><i style="width:${k.score}%"></i></div>
+    </div>
+    <div class="state">
+      <div class="state-label">生命周期状态</div>
+      <div class="flow">${flow}</div>
+    </div>
+    <div class="meta" style="margin-top:12px">${k.tags.map(x=>`<span class="chip dark">${x}</span>`).join('')}</div>
+  `;
+}
+
+function renderConvo(c){
+  $('#convo').innerHTML = `<div class="convo-title">会话记录</div>` + c.convo.map(m=>{
+    if(m.from==='sys'){
+      const ic = m.tone==='block' ? IC.block : (m.tone==='ok' ? IC.check : IC.warn);
+      return `<div class="sys ${m.tone||''}">${ic}<span>${m.text}</span></div>`;
+    }
+    return `<div class="msg ${m.from}">
+      <div class="who"><b>${m.who}</b><span class="time">${m.time}</span></div>
+      <div class="bubble">${m.text}</div>
+    </div>`;
+  }).join('');
+  $('#convo').scrollTop = 0;
+}
+
+function bodyHTML(b){
+  if(!b) return '';
+  if(b.type==='rows'){
+    const rows = b.rows.map(([k,v,cls])=>{
+      const conf = (k==='置信度' && b.conf)
+        ? `<div class="conf"><div class="bar" style="width:110px"><i style="width:${b.conf*100}%;background:var(--green)"></i></div><span>${b.conf.toFixed(2)}</span></div>`
+        : '';
+      return `<dt>${k}</dt><dd class="${cls||''}">${v}${conf}</dd>`;
+    }).join('');
+    return `<dl class="kv">${rows}</dl>`;
+  }
+  if(b.type==='checks'){
+    return `<div class="checks">${b.items.map(it=>{
+      const ic = it.ok==='pass'?IC.check : it.ok==='fail'?IC.cross : IC.warn;
+      const cls = it.ok==='pass'?'pass' : it.ok==='fail'?'fail':'warnc';
+      return `<div class="ck ${cls}"><span class="ic">${ic}</span><span>${it.text}${it.sub?`<small>${it.sub}</small>`:''}</span></div>`;
+    }).join('')}</div>`;
+  }
+  if(b.type==='mail'){
+    return `<div class="mail">
+      <div class="mail-h"><b>Subject</b> · ${b.subject}</div>
+      <div class="mail-b">${b.html}</div>
+      <div class="mail-f"><span>${b.foot[0]}</span><span>${b.foot[1]}</span></div>
+    </div>`;
+  }
+  if(b.type==='handoff'){
+    return `<div class="handoff"><h4>交接包 / 后续动作</h4><ul>${b.items.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+  }
+  return '';
+}
+
+function renderSteps(c){
+  $('#steps').innerHTML = c.steps.map((s,i)=>{
+    const toneCls = s.tone==='r' ? (s.name==='策略校验'||s.name==='闭环' ? 'blocked':'') : (s.tone==='g'?'passed':'');
+    return `<div class="step ${toneCls}" data-i="${i}">
+      <div class="shead">
+        <div class="num">${s.n}</div>
+        <div style="flex:1">
+          <div class="stitle">${s.name}<span class="tag ${s.tone}">${s.tag}</span></div>
+          <div class="sdesc">${s.desc}</div>
+          <div class="why"><b>为什么这一步重要 · </b>${s.why}</div>
+        </div>
+        <span class="caret">${IC.caret}</span>
+      </div>
+      <div class="sbody">${bodyHTML(s.body)}</div>
+    </div>`;
+  }).join('');
+
+  $('#steps').querySelectorAll('.shead').forEach((h,i)=>{
+    h.onclick = ()=>{
+      const el = h.parentElement;
+      el.classList.toggle('open');
+      el.classList.toggle('cur', el.classList.contains('open'));
+    };
+  });
+}
+
+function renderMetrics(c){
+  $('#metrics').innerHTML = c.metrics.map(m=>
+    `<div class="m"><div class="k">${m.k}</div><div class="v ${m.cls||''}">${m.v}</div></div>`
+  ).join('');
+}
+
+function render(){
+  clearTimers();
+  const c = CASES[cur];
+  $('#caseTitle').textContent = c.title;
+  $('#caseSub').textContent = c.sub;
+  const v = $('#verdict');
+  v.className = 'verdict ' + (c.verdict.tone==='human'?'human':'auto');
+  v.innerHTML = `<span class="dot"></span>${c.verdict.label}`;
+  renderTabs(); renderCreator(c); renderConvo(c); renderSteps(c); renderMetrics(c);
+}
+
+/* ---------- play ---------- */
+function play(){
+  clearTimers();
+  const cards = [...$('#steps').querySelectorAll('.step')];
+  cards.forEach(el=>{ el.classList.remove('show','open','cur'); });
+  cards.forEach((el,i)=>{
+    timers.push(setTimeout(()=>{
+      el.classList.add('show','cur','open');
+      cards[i-1] && cards[i-1].classList.remove('cur');
+      el.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 260 + i*760));
+  });
+}
+
+$('#play').onclick = play;
+$('#expandAll').onclick = ()=>{
+  clearTimers();
+  $('#steps').querySelectorAll('.step').forEach(el=>el.classList.add('show','open'));
+};
+
+document.addEventListener('keydown', e=>{
+  if(e.key>='1' && e.key<='3'){ cur = +e.key-1; render(); }
+  if(e.code==='Space'){ e.preventDefault(); play(); }
+});
+
+render();
+setTimeout(play, 420);
+</script>
+</body>
+</html>
